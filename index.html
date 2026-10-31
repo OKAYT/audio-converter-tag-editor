@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Audio converter and tag editor — convert songs or recordings and edit title and artist information." />
+  <title>Audio Converter and Tag Editor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="binaryRain" aria-hidden="true"></canvas>
+  <div class="grid-overlay" aria-hidden="true"></div>
+
+  <header class="navbar">
+    <div class="container navbar__inner">
+      <a href="#top" class="logo" aria-label="Home">
+        <span class="logo__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        </span>
+        <span class="logo__text">Audio<span class="logo__accent">Tag</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#converter">Converter</a>
+        <a href="#how">How it works</a>
+      </nav>
+      <a href="#converter" class="btn btn--primary btn--sm">Get Started</a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation" aria-expanded="false"><span></span><span></span><span></span></button>
+    </div>
+    <div class="nav-mobile" id="navMobile">
+      <a href="#converter">Converter</a>
+      <a href="#how">How it works</a>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero reveal">
+      <div class="container">
+        <div class="hero__card">
+          <div class="hero__glow" aria-hidden="true"></div>
+          <div class="hero__content">
+            <span class="badge"><span class="badge__dot" aria-hidden="true"></span>Listen &rarr; Identify &rarr; Tag</span>
+            <h1 class="hero__title">Audio Converter and <span class="grad-text">Tag Editor</span></h1>
+            <p class="hero__subtitle">Convert songs or recordings and edit title and artist information. Let the system listen and find the song title and artist for you.</p>
+            <div class="hero__actions">
+              <a href="#converter" class="btn btn--primary">Get Started</a>
+              <a href="#how" class="btn btn--ghost">Learn More</a>
+            </div>
+          </div>
+          <div class="hero__orbit" aria-hidden="true">
+            <div class="orbit-ring orbit-ring--1"></div>
+            <div class="orbit-ring orbit-ring--2"></div>
+            <div class="orbit-core"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+            <span class="orbit-bubble orbit-bubble--a">♪</span>
+            <span class="orbit-bubble orbit-bubble--b">♫</span>
+            <span class="orbit-bubble orbit-bubble--d">♬</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="converter" class="section reveal">
+      <div class="container">
+        <div class="section__head">
+          <span class="eyebrow">The tool</span>
+          <h2 class="section__title">Identify <span class="grad-text">&amp;</span> Tag</h2>
+          <p class="section__sub">Upload a song or record it with your microphone, then identify, edit and download.</p>
+        </div>
+
+        <div class="converter">
+          <div class="tabs" role="tablist" aria-label="Input source">
+            <button class="tab is-active" role="tab" aria-selected="true" data-tab="upload">Upload song</button>
+            <button class="tab" role="tab" aria-selected="false" data-tab="mic">Microphone</button>
+          </div>
+
+          <div class="converter__grid">
+            <div class="converter__main">
+              <div class="visualizer">
+                <canvas id="viz" width="900" height="220" aria-label="Audio visualizer"></canvas>
+                <div class="visualizer__hint">Waiting for audio&hellip;</div>
+              </div>
+
+              <div class="panel is-active" data-panel="upload">
+                <label class="dropzone" for="fileInput" id="dropzone">
+                  <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+                  <span class="dropzone__title" id="fileName">Drop a song or click to browse</span>
+                  <span class="dropzone__sub">Supports .mp3, .wav, .ogg, .m4a</span>
+                  <input type="file" id="fileInput" accept=".mp3,.wav,.ogg,.m4a,audio/*" hidden />
+                </label>
+              </div>
+
+              <div class="panel" data-panel="mic">
+                <div class="mic-row">
+                  <button class="mic-btn" id="micBtn" aria-label="Start listening">
+                    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
+                  </button>
+                  <div class="panel__info">
+                    <strong id="micStatus">Tap to listen</strong>
+                    <span>Play a song near the mic. It listens for 12 seconds, then identifies the title and artist automatically.</span>
+                  </div>
+                </div>
+              </div>
+
+              <audio id="player" controls hidden></audio>
+
+              <div class="match" id="match" aria-live="polite">
+                <small>Match found</small>
+                <strong id="matchTitle"></strong>
+                <span id="matchArtist"></span>
+                <span id="matchWriter"></span>
+              </div>
+            </div>
+
+            <aside class="converter__side">
+              <div class="card settings">
+                <h3 class="card__title">Tag editor</h3>
+                <div class="tagform">
+                  <label class="field field--full"><span>Title</span><input type="text" id="tagTitle" placeholder="Song title" /></label>
+                  <label class="field field--full"><span>Artist / author</span><input type="text" id="tagArtist" placeholder="Artist name" /></label>
+                  <label class="field field--full"><span>Writer / composer</span><input type="text" id="tagWriter" placeholder="Songwriter (auto-filled when available)" /></label>
+                  <label class="field"><span>Album</span><input type="text" id="tagAlbum" placeholder="Album" /></label>
+                  <label class="field"><span>Year</span><input type="text" id="tagYear" placeholder="2024" maxlength="4" /></label>
+                </div>
+                <label class="check"><input type="checkbox" id="autoIdentify" checked /><span>Identify automatically after audio loads or a recording ends</span></label>
+                <button class="btn btn--primary btn--sm btn--block" id="identifyBtn">Identify song</button>
+                <label class="field"><span>AudD API token (optional, saved in your browser)</span><input type="password" id="apiToken" placeholder="api_token from audd.io" autocomplete="off" /></label>
+                <span class="hint">Song recognition uses the free <a href="https://dashboard.audd.io/" target="_blank" rel="noopener">AudD</a> service, so it needs internet. It works without a token for light use; add a free token above if you hit the limit.</span>
+              </div>
+
+              <div class="card settings">
+                <h3 class="card__title">Convert &amp; save</h3>
+                <label class="field"><span>Output format</span>
+                  <select id="outFormat"><option value="mp3">MP3 (convert)</option><option value="wav">WAV (convert)</option><option value="mp3tag">MP3 (keep audio, update tags only)</option></select>
+                </label>
+                <label class="field"><span>MP3 bitrate</span>
+                  <select id="bitrate"><option value="128" selected>128 kbps</option><option value="192">192 kbps</option><option value="256">256 kbps</option><option value="320">320 kbps</option></select>
+                </label>
+                <label class="field"><span>Sample rate</span>
+                  <select id="sampleRate"><option value="0">Original</option><option value="44100">44,100 Hz</option><option value="22050">22,050 Hz</option><option value="11025">11,025 Hz</option></select>
+                </label>
+                <label class="field"><span>Channels</span>
+                  <select id="channels"><option value="0">Original</option><option value="1">Mono</option><option value="2">Stereo</option></select>
+                </label>
+                <button class="btn btn--primary btn--sm" id="saveBtn">Download with tags</button>
+                <div class="progress" id="progress" hidden><div class="progress__bar" id="progressBar"></div></div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="section reveal">
+      <div class="container">
+        <div class="section__head">
+          <span class="eyebrow">How it works</span>
+          <h2 class="section__title">From sound to <span class="grad-text">song info</span></h2>
+        </div>
+        <div class="steps">
+          <article class="step"><span class="step__num">01</span><h3>Listen</h3><p>Upload a song or let the microphone hear it for a few seconds.</p></article>
+          <article class="step"><span class="step__num">02</span><h3>Identify</h3><p>An audio fingerprint is matched to find the title and artist.</p></article>
+          <article class="step"><span class="step__num">03</span><h3>Edit</h3><p>Fix the title, artist, album or year by hand if needed.</p></article>
+          <article class="step"><span class="step__num">04</span><h3>Save</h3><p>Download as WAV, or keep the MP3 audio with fresh ID3 tags.</p></article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer__inner">
+      <div class="footer__brand"><span class="logo__text">Audio<span class="logo__accent">Tag</span></span><p>Audio Converter and Tag Editor</p></div>
+      <p class="footer__copy">© <span id="year"></span> Audio Converter and Tag Editor.</p>
+    </div>
+  </footer>
+
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="true"></div>
+  <script src="script.js"></script>
+</body>
+</html>
