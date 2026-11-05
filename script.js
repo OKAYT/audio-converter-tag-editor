@@ -241,6 +241,30 @@ function setTags(t) { for (const k in f) if (t[k]) f[k].value = t[k]; }
 function clearTags() { for (const k in f) f[k].value = ''; }
 function setProgress(r, vis) { els.progress.hidden = !vis; els.progressBar.style.width = vis ? clamp(r, 0, 1) * 100 + '%' : '0%'; }
 
+/* ============ YouTube / Spotify links for the match card ============ */
+const matchLinks = $('#matchLinks');
+const ytLink = $('#ytLink');
+const spLink = $('#spLink');
+
+function resetMatchLinks() {
+  matchLinks.hidden = true;
+  ytLink.removeAttribute('href');
+  spLink.removeAttribute('href');
+}
+
+function updateMatchLinks() {
+  const query = [f.artist.value.trim(), f.title.value.trim()].filter(Boolean).join(' ');
+  if (!query) { resetMatchLinks(); return; }
+  const q = encodeURIComponent(query);
+  ytLink.href = 'https://www.youtube.com/results?search_query=' + q;
+  spLink.href = 'https://open.spotify.com/search/' + q;
+  matchLinks.hidden = false;
+}
+
+[f.title, f.artist].forEach((el) => el.addEventListener('input', () => {
+  if ($('#match').classList.contains('is-on')) updateMatchLinks();
+}));
+
 /* ============ Load audio (upload or recording) ============ */
 function extForMime(mime = '') {
   if (/mpeg|mp3/i.test(mime)) return 'mp3';
@@ -263,6 +287,7 @@ async function loadBlob(blob, name, opts = {}) {
   player.src = state.objectUrl; player.hidden = false;
   $('#match').classList.remove('is-on');
   $('#matchWriter').textContent = '';
+  resetMatchLinks();
   clearTags();
   try {
     state.buffer = await ctx.decodeAudioData(await blob.arrayBuffer());
@@ -351,6 +376,7 @@ async function identify() {
     $('#matchArtist').textContent = [r.artist, r.album].filter(Boolean).join(' — ');
     $('#matchWriter').textContent = '';
     $('#match').classList.add('is-on');
+    updateMatchLinks();
     showToast('Song identified', [r.title, r.artist].filter(Boolean).join(' — '), 'success');
     const identifiedTitle = r.title;
     lookupWriter(r.title, r.artist).then((writer) => {

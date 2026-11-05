@@ -45,8 +45,9 @@ Double-click `index.html`. Upload, identify, edit and convert work, but the micr
 1. **Upload song** tab — drop an MP3/WAV/OGG/M4A file.
 2. Or **Microphone** tab — click the mic button, allow access, play the song near the mic for ~12 seconds.
 3. Title, artist, album, year and writer fill in automatically when a match is found.
-4. Edit anything manually if needed.
-5. Choose the output format and click **Download with tags**.
+4. The match card also shows **YouTube** and **Spotify** buttons that search for that artist and title in a new tab. They follow any edits you make to the title or artist.
+5. Edit anything manually if needed.
+6. Choose the output format and click **Download with tags**.
 
 ## Notes
 

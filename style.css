@@ -695,7 +695,41 @@ body > footer { position: relative; z-index: 1; }
   line-height: 1.3;
 }
 
-.match span { color: var(--text-soft); font-size: 13.5px; }
+.match > span { color: var(--text-soft); font-size: 13.5px; }
+
+.match__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.match__links[hidden] { display: none; }
+
+.match__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: rgba(8, 18, 11, 0.72);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.match__link svg { flex: none; width: 15px; height: 15px; }
+.match__link:hover { transform: translateY(-1px); }
+.match__link:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+.match__link--yt svg { color: #ff4d4d; }
+.match__link--yt:hover { border-color: rgba(255, 77, 77, 0.55); background: rgba(255, 77, 77, 0.12); }
+
+.match__link--sp svg { color: #1ed760; }
+.match__link--sp:hover { border-color: rgba(30, 215, 96, 0.55); background: rgba(30, 215, 96, 0.12); }
 
 /* ---------- Side cards ---------- */
 .converter__side { display: grid; gap: 16px; min-width: 0; }
