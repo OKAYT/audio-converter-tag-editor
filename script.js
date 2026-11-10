@@ -515,6 +515,37 @@ const AUDD_TOKEN = '';
 const AUDD_PROXY = 'https://audio-converter-tag-editor.tumagnaalfred.workers.dev';
 $('#identifyBtn').addEventListener('click', identify);
 
+/* Recognition providers accept mp3/wav/ogg/m4a but not the .webm the browser records.
+   Render the first ~20 s of the recording down to a compact mono 16 kHz WAV (Opus-decoded
+   in-browser) — small enough for every provider's size limit and plenty for matching,
+   since Shazam/AuD fingerprints work on ~10-second excerpts. */
+const IDENTIFY_SECONDS = 20;
+async function wavForIdentify(buffer) {
+  try {
+    const seconds = Math.min(buffer.duration, IDENTIFY_SECONDS);
+    if (seconds < 5) return null; // too short to identify anyway
+    const off = new OfflineAudioContext(1, Math.ceil(seconds * 16000), 16000);
+    const src = off.createBufferSource();
+    src.buffer = buffer; src.connect(off.destination);
+    src.start(0); // renders only the first IDENTIFY_SECONDS (output length caps it)
+    const mono = await off.startRendering();
+    return new Blob([encodeWav(mono)], { type: 'audio/wav' });
+  } catch (_) { return null; } // conversion failed → fall back to the original blob
+}
+function encodeWav(buffer) { // minimal 16-bit PCM mono WAV writer
+  const n = buffer.length;
+  const out = new ArrayBuffer(44 + n * 2), v = new DataView(out);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, buffer.sampleRate, true); v.setUint32(28, buffer.sampleRate * 2, true);
+  v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+  const d = buffer.getChannelData(0);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(clamp(d[i], -1, 1) * 32767), true);
+  return out;
+}
+
 /* Returns 'ok' | 'nomatch' | 'error' so the mic flow can auto-retry after an intro-only clip */
 async function identify() {
   if (!state.blob) { showToast('No audio yet', 'Upload a song or use the microphone first.', 'error'); return 'error'; }
@@ -524,8 +555,15 @@ async function identify() {
     const fd = new FormData();
     if (token) fd.append('api_token', token);
     const limit = 9.5e6;
-    const file = state.blob.size > limit ? state.blob.slice(0, limit) : state.blob;
-    fd.append('file', file, state.fileName || ('recording.' + extForMime(state.mime)));
+    let file = state.blob.size > limit ? state.blob.slice(0, limit) : state.blob;
+    let fileName = state.fileName || ('recording.' + extForMime(state.mime));
+    // Mic recordings are .webm (Opus) — recognition APIs accept mp3/wav/ogg/m4a, not webm,
+    // so convert the first ~20 seconds to a compact mono WAV before identifying.
+    if (!state.isMp3 && state.buffer) {
+      const wav = await wavForIdentify(state.buffer);
+      if (wav && wav.size < limit) { file = wav; fileName = 'recording.wav'; }
+    }
+    fd.append('file', file, fileName);
     const res = await fetch(AUDD_PROXY || 'https://api.audd.io/', { method: 'POST', body: fd });
     const data = await res.json();
     if (data.status === 'error') throw new Error((data.error && data.error.error_message) || 'Request failed');
