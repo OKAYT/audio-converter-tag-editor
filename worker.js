@@ -69,6 +69,7 @@ export default {
         const providers = shazamProviders(env);
         const bytes = await file.arrayBuffer();
         const lastErr = { message: '' };
+        const tried = []; // safe diagnostics: host + status + short reply (never the key)
 
         for (const p of providers) {
           let res;
@@ -82,14 +83,19 @@ export default {
               },
               body: p.type === 'raw' ? bytes : multipartForShazam(file, bytes),
             });
-          } catch (e) { lastErr.message = p.host + ': ' + e.message; continue; }
+          } catch (e) {
+            tried.push({ host: p.host, error: e.message });
+            lastErr.message = p.host + ': ' + e.message;
+            continue;
+          }
 
           const text = await res.text();
+          tried.push({ host: p.host, status: res.status, reply: text.slice(0, 160) });
           const data = parseJson(text);
 
           // RapidAPI answers 403 when the key is NOT subscribed to this particular API
           if (res.status === 403 || /not subscribed|Invalid API key/i.test(text)) {
-            lastErr.message = p.host + ': not subscribed to this API';
+            lastErr.message = p.host + ': ' + (data && data.message ? data.message : 'not subscribed to this API');
             continue; // try the next Shazam provider
           }
 
@@ -112,6 +118,7 @@ export default {
           error: { error_message: noMatch
             ? 'No song match found. Try a clearer or longer clip.'
             : 'Shazam engine unavailable (' + (lastErr.message || 'check RAPIDAPI_KEY') + ')' },
+          diagnostics: tried,
         }, 200);
       }
 
