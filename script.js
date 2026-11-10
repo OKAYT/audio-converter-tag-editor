@@ -241,29 +241,157 @@ function setTags(t) { for (const k in f) if (t[k]) f[k].value = t[k]; }
 function clearTags() { for (const k in f) f[k].value = ''; }
 function setProgress(r, vis) { els.progress.hidden = !vis; els.progressBar.style.width = vis ? clamp(r, 0, 1) * 100 + '%' : '0%'; }
 
-/* ============ YouTube / Spotify links for the match card ============ */
+/* ============ Match card: album art + direct links to the exact song ============ */
 const matchLinks = $('#matchLinks');
 const ytLink = $('#ytLink');
 const spLink = $('#spLink');
+const matchArt = $('#matchArt');
+const matchArtFallback = $('#matchArtFallback');
 
-function resetMatchLinks() {
-  matchLinks.hidden = true;
-  ytLink.removeAttribute('href');
-  spLink.removeAttribute('href');
+/* Direct links for the identified song, plus search URLs as a last resort */
+let matchInfo = { youtubeUrl: null, youtubeVideoId: null, spotifyUrl: null, ytSearch: '', spSearch: '' };
+
+function setMatchArt(coverUrl, fallbackUrl) {
+  matchArt.onload = () => { matchArt.hidden = false; matchArtFallback.hidden = true; };
+  matchArt.onerror = () => {
+    if (fallbackUrl && matchArt.src !== fallbackUrl) {
+      matchArt.src = fallbackUrl; // e.g. YouTube thumbnail in lower resolution
+    } else {
+      matchArt.hidden = true;
+      matchArtFallback.hidden = false;
+    }
+  };
+  if (coverUrl) {
+    coverUrl = coverUrl.replace('{w}', '600').replace('{h}', '600');
+    matchArt.hidden = true;   // show the placeholder until the cover finishes loading
+    matchArtFallback.hidden = false;
+    matchArt.src = coverUrl;  // onload swaps the cover in
+  } else {
+    matchArt.hidden = true;
+    matchArt.removeAttribute('src');
+    matchArt.onerror = null;
+    matchArtFallback.hidden = false;
+  }
 }
 
-function updateMatchLinks() {
+function resetMatchLinks() {
+  matchInfo = { youtubeUrl: null, youtubeVideoId: null, spotifyUrl: null, ytSearch: '', spSearch: '' };
+  matchArt.onload = matchArt.onerror = null;
+  setMatchArt(null);
+  matchLinks.hidden = true;
+}
+
+/* Search fallbacks so the buttons are never dead, even offline */
+function refreshMatchButtons() {
   const query = [f.artist.value.trim(), f.title.value.trim()].filter(Boolean).join(' ');
-  if (!query) { resetMatchLinks(); return; }
-  const q = encodeURIComponent(query);
-  ytLink.href = 'https://www.youtube.com/results?search_query=' + q;
-  spLink.href = 'https://open.spotify.com/search/' + q;
+  if (query) {
+    const q = encodeURIComponent(query);
+    matchInfo.ytSearch = 'https://www.youtube.com/results?search_query=' + q;
+    matchInfo.spSearch = 'https://open.spotify.com/search/' + q;
+  }
   matchLinks.hidden = false;
 }
 
 [f.title, f.artist].forEach((el) => el.addEventListener('input', () => {
-  if ($('#match').classList.contains('is-on')) updateMatchLinks();
+  if ($('#match').classList.contains('is-on')) refreshMatchButtons();
 }));
+
+/* Free iTunes lookup (JSONP, no key): album cover fallback + Apple Music link */
+function itunesLookup(term) {
+  return new Promise((resolve) => {
+    const cb = 'itunesCb_' + Math.random().toString(36).slice(2);
+    const s = document.createElement('script');
+    let done = false;
+    const finish = (val) => {
+      if (done) return; done = true;
+      clearTimeout(timer);
+      try { delete window[cb]; } catch (_) { window[cb] = undefined; }
+      s.remove();
+      resolve(val || null);
+    };
+    const timer = setTimeout(() => finish(null), 8000);
+    window[cb] = (data) => finish((data && data.results && data.results[0]) || null);
+    s.src = 'https://itunes.apple.com/search?term=' + encodeURIComponent(term)
+      + '&entity=song&limit=1&callback=' + cb;
+    s.onerror = () => finish(null);
+    document.head.appendChild(s);
+  });
+}
+
+/* Resolve the exact YouTube video for a song via the Jina reader (no API key) */
+async function resolveYouTubeVideo(title, artist) {
+  const q = [artist, title].filter(Boolean).join(' ');
+  if (!q) return '';
+  try {
+    const res = await fetch('https://r.jina.ai/https://www.youtube.com/results?search_query=' + encodeURIComponent(q));
+    if (!res.ok) return '';
+    const text = await res.text();
+    const items = [];
+    const re = /\[([^\]]{0,120}?)\]\(https:\/\/www\.youtube\.com\/watch\?v=([\w-]{11})/g;
+    let m;
+    while ((m = re.exec(text))) items.push({ t: m[1].toLowerCase(), id: m[2] });
+    if (!items.length) {
+      const bare = [...text.matchAll(/watch\?v=([\w-]{11})/g)].map((x) => x[1]);
+      return bare[0] || '';
+    }
+    // Prefer the result whose video title mentions the most words from artist + song title
+    const keys = q.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+    let best = items[0], bestScore = -1;
+    for (const it of items) {
+      const score = keys.reduce((n, k) => n + (it.t.includes(k) ? 1 : 0), 0);
+      if (score > bestScore) { bestScore = score; best = it; }
+    }
+    return best.id;
+  } catch (_) { return ''; }
+}
+
+/* Buttons open the site itself, straight on the exact song (no search list) */
+ytLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  if (matchInfo.youtubeVideoId) {
+    window.open('https://www.youtube.com/watch?v=' + matchInfo.youtubeVideoId, '_blank', 'noopener');
+    return;
+  }
+  if (matchInfo.ytSearch) window.open(matchInfo.ytSearch, '_blank', 'noopener');
+});
+
+spLink.addEventListener('click', (e) => {
+  e.preventDefault();
+  if (matchInfo.spotifyUrl) {
+    window.open(matchInfo.spotifyUrl, '_blank', 'noopener');
+    return;
+  }
+  if (matchInfo.spSearch) window.open(matchInfo.spSearch, '_blank', 'noopener');
+});
+
+/* Enrich the match result after AudD identifies the song */
+async function hydrateMatch(r) {
+  const mine = matchInfo; // guard: a newer match/load may replace matchInfo while we await
+  matchInfo.spotifyUrl = (r.spotify && r.spotify.external_urls && r.spotify.external_urls.spotify) || null;
+  let cover = '';
+  const spImages = (r.spotify && r.spotify.album && r.spotify.album.images) || [];
+  if (spImages.length && spImages[0].url) cover = spImages[0].url;
+  else if (r.apple_music && r.apple_music.artwork && r.apple_music.artwork.url) cover = r.apple_music.artwork.url;
+  setMatchArt(cover || null);
+
+  // iTunes: artwork fallback when AudD didn't include a cover
+  const term = [r.title, r.artist].filter(Boolean).join(' ');
+  const it = await itunesLookup(term);
+  if (matchInfo !== mine) return; // out-of-date result, ignore it
+  if (it && !cover && it.artworkUrl100) setMatchArt(it.artworkUrl100.replace('100x100', '600x600'));
+
+  // Resolve the exact YouTube video, so the button opens the song itself
+  const videoId = await resolveYouTubeVideo(r.title, r.artist);
+  if (matchInfo !== mine) return; // out-of-date result, ignore it
+  if (videoId) {
+    matchInfo.youtubeVideoId = videoId;
+    matchInfo.youtubeUrl = 'https://www.youtube.com/watch?v=' + videoId;
+    // Cover photo = the exact same picture shown on YouTube for that video
+    setMatchArt('https://i.ytimg.com/vi/' + videoId + '/maxresdefault.jpg',
+                'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg');
+  }
+  refreshMatchButtons();
+}
 
 /* ============ Load audio (upload or recording) ============ */
 function extForMime(mime = '') {
@@ -307,16 +435,18 @@ const dz = $('#dropzone');
 ['dragleave', 'drop'].forEach((v) => dz.addEventListener(v, (e) => { e.preventDefault(); dz.classList.remove('is-drag'); }));
 dz.addEventListener('drop', (e) => { const x = e.dataTransfer.files[0]; if (x) { $('#fileName').textContent = x.name; loadBlob(x, x.name, { auto: true }); } });
 
-/* ============ Microphone: listen 12s then identify ============ */
-const LISTEN_SECONDS = 12;
+/* ============ Microphone: record (length set below) then identify ============ */
+const LISTEN_SECONDS = 12;      // default quick-identify length
+const MAX_RECORD_SECONDS = 600; // safety cap for "until I tap stop"
+const MAX_MIC_TRIES = 3;        // auto-retries so a short intro clip still gets recognized
 let micTimer = null, micTick = null;
+let micTry = 0;
 
-$('#micBtn').addEventListener('click', async () => {
-  if (state.recording) { state.rec.stop(); return; }
+function startMic() {
+  const tryNo = micTry + 1; // display number, starts at 1
   const ctx = ensureCtx(); if (!ctx) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Microphone unavailable', 'Use https:// or localhost.', 'error'); return; }
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(async (stream) => {
     state.stream = stream;
     const an = ctx.createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0.75;
     ctx.createMediaStreamSource(stream).connect(an); state.analyser = an; state.staticWave = null;
@@ -335,30 +465,60 @@ $('#micBtn').addEventListener('click', async () => {
       }
       $('#micStatus').textContent = 'Identifying…';
       await loadBlob(blob, 'recording.' + extForMime(blob.type));
-      if ($('#autoIdentify').checked) identify();
-      else $('#micStatus').textContent = 'Tap to listen';
+      if ($('#autoIdentify').checked) {
+        const result = await identify();
+        // Only the intro was heard? Listen again to catch a clearer part of the song.
+        if (result === 'nomatch' && micTry + 1 < MAX_MIC_TRIES) {
+          micTry += 1;
+          showToast('No match yet', 'Only heard the intro — listening again to catch a clearer part '
+            + '(try ' + (micTry + 1) + ' of ' + MAX_MIC_TRIES + ').', 'info', 7000);
+          startMic();
+          return;
+        }
+        micTry = 0;
+      } else $('#micStatus').textContent = 'Tap to listen';
     };
     rec.start(); state.recording = true; els.vizWrap.classList.add('is-live');
     $('#micBtn').classList.add('is-recording');
-    let left = LISTEN_SECONDS;
-    $('#micStatus').textContent = `Listening… ${left}s (tap to stop)`;
+    const recLen = parseInt($('#recLength').value, 10);
+    const limit = recLen > 0 ? recLen : MAX_RECORD_SECONDS; // 0 = record until the user taps stop
+    let left = limit;
+    const fmt = (s) => s >= 60 ? Math.floor(s / 60) + 'm ' + (s % 60) + 's' : s + 's';
+    const tryLabel = tryNo > 1 ? ` (try ${tryNo} of ${MAX_MIC_TRIES})` : '';
+    if (recLen > 0) $('#micStatus').textContent = `Listening… ${fmt(left)}${tryLabel} (tap to stop)`;
+    else $('#micStatus').textContent = `Recording…${tryLabel} (tap to stop)`;
     micTick = setInterval(() => {
       left -= 1;
-      if (left > 0) $('#micStatus').textContent = `Listening… ${left}s (tap to stop)`;
+      if (recLen > 0) {
+        if (left > 0) $('#micStatus').textContent = `Listening… ${fmt(left)}${tryLabel} (tap to stop)`;
+      } else if (left > 0) {
+        $('#micStatus').textContent = `Recording… ${fmt(MAX_RECORD_SECONDS - left)}${tryLabel} (tap to stop)`;
+      }
     }, 1000);
-    micTimer = setTimeout(() => { if (state.recording) rec.stop(); }, LISTEN_SECONDS * 1000);
-  } catch (err) { showToast('Microphone error', err.name === 'NotAllowedError' ? 'Allow mic access to listen.' : err.message, 'error'); }
+    micTimer = setTimeout(() => { if (state.recording) rec.stop(); }, limit * 1000);
+  }).catch((err) => showToast('Microphone error', err.name === 'NotAllowedError' ? 'Allow mic access to listen.' : err.message, 'error'));
+}
+
+$('#micBtn').addEventListener('click', () => {
+  if (state.recording) { state.rec.stop(); return; }
+  micTry = 0; // manual start resets the auto-retry count
+  startMic();
 });
 
 /* ============ Identify song (AudD API) ============ */
-const tokenEl = $('#apiToken');
-try { tokenEl.value = localStorage.getItem('audd_token') || ''; } catch (_) {}
-tokenEl.addEventListener('input', () => { try { localStorage.setItem('audd_token', tokenEl.value.trim()); } catch (_) {} });
+/* Visitors never need to type anything.
+   - AUDD_TOKEN: optional — your own free token from https://dashboard.audd.io
+   - AUDD_PROXY: optional — URL of your Cloudflare Worker proxy (see worker.js in this folder).
+     The proxy hides your token completely and gives you a much bigger daily quota;
+     you add the token as a secret on Cloudflare, never in this file. */
+const AUDD_TOKEN = '';
+const AUDD_PROXY = '';
 $('#identifyBtn').addEventListener('click', identify);
 
+/* Returns 'ok' | 'nomatch' | 'error' so the mic flow can auto-retry after an intro-only clip */
 async function identify() {
-  if (!state.blob) { showToast('No audio yet', 'Upload a song or use the microphone first.', 'error'); return; }
-  const token = tokenEl.value.trim();
+  if (!state.blob) { showToast('No audio yet', 'Upload a song or use the microphone first.', 'error'); return 'error'; }
+  const token = AUDD_PROXY ? '' : AUDD_TOKEN; // the proxy adds the token itself
   const btn = $('#identifyBtn'); btn.disabled = true; btn.textContent = 'Identifying…';
   try {
     const fd = new FormData();
@@ -366,17 +526,17 @@ async function identify() {
     const limit = 9.5e6;
     const file = state.blob.size > limit ? state.blob.slice(0, limit) : state.blob;
     fd.append('file', file, state.fileName || ('recording.' + extForMime(state.mime)));
-    const res = await fetch('https://api.audd.io/', { method: 'POST', body: fd });
+    const res = await fetch(AUDD_PROXY || 'https://api.audd.io/', { method: 'POST', body: fd });
     const data = await res.json();
     if (data.status === 'error') throw new Error((data.error && data.error.error_message) || 'Request failed');
     const r = data.result;
-    if (!r) { showToast('No match', 'The song was not recognized. Try a clearer or longer clip, or edit the tags manually.', 'error', 5500); return; }
+    if (!r) { showToast('No match', 'The song was not recognized. Try a clearer or longer clip, or edit the tags manually.', 'error', 5500); return 'nomatch'; }
     setTags({ title: r.title, artist: r.artist, album: r.album, year: (r.release_date || '').slice(0, 4) });
     $('#matchTitle').textContent = r.title || '';
     $('#matchArtist').textContent = [r.artist, r.album].filter(Boolean).join(' — ');
     $('#matchWriter').textContent = '';
     $('#match').classList.add('is-on');
-    updateMatchLinks();
+    hydrateMatch(r);
     showToast('Song identified', [r.title, r.artist].filter(Boolean).join(' — '), 'success');
     const identifiedTitle = r.title;
     lookupWriter(r.title, r.artist).then((writer) => {
@@ -384,14 +544,15 @@ async function identify() {
       f.writer.value = writer;
       $('#matchWriter').textContent = 'Written by ' + writer;
     });
+    return 'ok';
   } catch (e) {
     const msg = e.message || 'Network error';
     if (/token/i.test(msg)) {
-      showToast('API token needed', 'The free recognition limit was reached. Paste an AudD token in the Tag editor and try again.', 'error', 7000);
-      tokenEl.focus();
+      showToast('Free limit reached', 'AudD\u2019s free quota ran out. See the steps in README.md (AudD token or worker.js proxy) to lift it.', 'error', 8000);
     } else {
       showToast('Could not identify', msg + ' — check your internet connection and API token.', 'error', 6000);
     }
+    return 'error';
   } finally {
     btn.disabled = false; btn.textContent = 'Identify song';
     if (!state.recording) $('#micStatus').textContent = 'Tap to listen';

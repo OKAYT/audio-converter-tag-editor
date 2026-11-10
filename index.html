@@ -99,27 +99,44 @@
                   </button>
                   <div class="panel__info">
                     <strong id="micStatus">Tap to listen</strong>
-                    <span>Play a song near the mic. It listens for 12 seconds, then identifies the title and artist automatically.</span>
+                    <span>Play a song near the mic, then it identifies the title and artist automatically. Pick a recording length below — the full recording is kept, so you can download the whole song. If only the intro is heard, it listens again for a clearer part.</span>
                   </div>
                 </div>
+                <label class="field field--full mic-length"><span>Recording length</span>
+                  <select id="recLength">
+                    <option value="12" selected>12 seconds — quick identify, short clip</option>
+                    <option value="30">30 seconds</option>
+                    <option value="60">1 minute</option>
+                    <option value="120">2 minutes</option>
+                    <option value="0">Until I tap stop — record the whole song</option>
+                  </select>
+                </label>
               </div>
 
               <audio id="player" controls hidden></audio>
 
               <div class="match" id="match" aria-live="polite">
                 <small>Match found</small>
-                <strong id="matchTitle"></strong>
-                <span id="matchArtist"></span>
-                <span id="matchWriter"></span>
-                <div class="match__links" id="matchLinks" hidden>
-                  <a class="match__link match__link--yt" id="ytLink" href="#" target="_blank" rel="noopener noreferrer">
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 12s0-3.9-.5-5.7a3 3 0 0 0-2.1-2.1C18.6 3.7 12 3.7 12 3.7s-6.6 0-8.4.5A3 3 0 0 0 1.5 6.3C1 8.1 1 12 1 12s0 3.9.5 5.7a3 3 0 0 0 2.1 2.1c1.8.5 8.4.5 8.4.5s6.6 0 8.4-.5a3 3 0 0 0 2.1-2.1C23 15.9 23 12 23 12ZM9.8 15.6V8.4l5.9 3.6-5.9 3.6Z"/></svg>
-                    <span>YouTube</span>
-                  </a>
-                  <a class="match__link match__link--sp" id="spLink" href="#" target="_blank" rel="noopener noreferrer">
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5A10.5 10.5 0 1 0 22.5 12 10.5 10.5 0 0 0 12 1.5Zm4.8 15.1a.7.7 0 0 1-1 .2c-2.6-1.6-5.9-2-9.8-1.1a.7.7 0 0 1-.3-1.4c4.3-1 8-.5 10.9 1.3a.7.7 0 0 1 .2 1Zm1.3-2.9a.9.9 0 0 1-1.2.3c-3-1.8-7.6-2.4-11.1-1.3a.9.9 0 1 1-.5-1.7c4-1.2 9.1-.6 12.5 1.5a.9.9 0 0 1 .3 1.2Zm.1-3a1 1 0 0 1-1.4.3c-3.5-2.1-9.3-2.3-12.7-1.3a1 1 0 1 1-.6-2c3.9-1.2 10.3-.9 14.4 1.5a1 1 0 0 1 .3 1.5Z"/></svg>
-                    <span>Spotify</span>
-                  </a>
+                <div class="match__body">
+                  <div class="match__art-wrap">
+                    <img id="matchArt" class="match__art" alt="Album cover" hidden />
+                    <div class="match__art-fallback" id="matchArtFallback" hidden aria-hidden="true">&#9834;</div>
+                  </div>
+                  <div class="match__text">
+                    <strong id="matchTitle"></strong>
+                    <span id="matchArtist"></span>
+                    <span id="matchWriter"></span>
+                  </div>
+                  <div class="match__links" id="matchLinks" hidden>
+                    <button class="match__link match__link--yt" id="ytLink" type="button" title="Open this song directly on YouTube">
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 12s0-3.9-.5-5.7a3 3 0 0 0-2.1-2.1C18.6 3.7 12 3.7 12 3.7s-6.6 0-8.4.5A3 3 0 0 0 1.5 6.3C1 8.1 1 12 1 12s0 3.9.5 5.7a3 3 0 0 0 2.1 2.1c1.8.5 8.4.5 8.4.5s6.6 0 8.4-.5a3 3 0 0 0 2.1-2.1C23 15.9 23 12 23 12ZM9.8 15.6V8.4l5.9 3.6-5.9 3.6Z"/></svg>
+                      <span>YouTube</span>
+                    </button>
+                    <button class="match__link match__link--sp" id="spLink" type="button" title="Open this song directly on Spotify">
+                      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5A10.5 10.5 0 1 0 22.5 12 10.5 10.5 0 0 0 12 1.5Zm4.8 15.1a.7.7 0 0 1-1 .2c-2.6-1.6-5.9-2-9.8-1.1a.7.7 0 0 1-.3-1.4c4.3-1 8-.5 10.9 1.3a.7.7 0 0 1 .2 1Zm1.3-2.9a.9.9 0 0 1-1.2.3c-3-1.8-7.6-2.4-11.1-1.3a.9.9 0 1 1-.5-1.7c4-1.2 9.1-.6 12.5 1.5a.9.9 0 0 1 .3 1.2Zm.1-3a1 1 0 0 1-1.4.3c-3.5-2.1-9.3-2.3-12.7-1.3a1 1 0 1 1-.6-2c3.9-1.2 10.3-.9 14.4 1.5a1 1 0 0 1 .3 1.5Z"/></svg>
+                      <span>Spotify</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -136,8 +153,7 @@
                 </div>
                 <label class="check"><input type="checkbox" id="autoIdentify" checked /><span>Identify automatically after audio loads or a recording ends</span></label>
                 <button class="btn btn--primary btn--sm btn--block" id="identifyBtn">Identify song</button>
-                <label class="field"><span>AudD API token (optional, saved in your browser)</span><input type="password" id="apiToken" placeholder="api_token from audd.io" autocomplete="off" /></label>
-                <span class="hint">Song recognition uses the free <a href="https://dashboard.audd.io/" target="_blank" rel="noopener">AudD</a> service, so it needs internet. It works without a token for light use; add a free token above if you hit the limit.</span>
+                <span class="hint">Song recognition uses the free <a href="https://dashboard.audd.io/" target="_blank" rel="noopener">AudD</a> service, so it needs internet. No setup or API key is needed — just connect.</span>
               </div>
 
               <div class="card settings">
