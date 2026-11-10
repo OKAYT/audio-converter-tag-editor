@@ -1,0 +1,7 @@
+{
+  // Cloudflare Workers settings — tells Cloudflare to RUN worker.js as code
+  // (without this file, Cloudflare only copies the repo as static assets)
+  "name": "audio-converter-tag-editor",
+  "main": "worker.js",
+  "compatibility_date": "2025-01-01"
+}
