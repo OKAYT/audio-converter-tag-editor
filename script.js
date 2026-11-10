@@ -512,7 +512,7 @@ $('#micBtn').addEventListener('click', () => {
      The proxy hides your token completely and gives you a much bigger daily quota;
      you add the token as a secret on Cloudflare, never in this file. */
 const AUDD_TOKEN = '';
-const AUDD_PROXY = '';
+const AUDD_PROXY = 'https://audio-converter-tag-editor.tumagnaalfred.workers.dev';
 $('#identifyBtn').addEventListener('click', identify);
 
 /* Returns 'ok' | 'nomatch' | 'error' so the mic flow can auto-retry after an intro-only clip */
