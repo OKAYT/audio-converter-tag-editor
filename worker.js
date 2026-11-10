@@ -74,13 +74,16 @@ export default {
         for (const p of providers) {
           let res;
           try {
+            // For multipart providers we must NOT set Content-Type ourselves:
+            // fetch then adds the correct "multipart/form-data; boundary=..." automatically.
+            const headers = {
+              'X-RapidAPI-Key': env.RAPIDAPI_KEY,
+              'X-RapidAPI-Host': p.host,
+            };
+            if (p.type === 'raw') headers['Content-Type'] = file.type || 'application/octet-stream';
             res = await fetch('https://' + p.host + p.path, {
               method: 'POST',
-              headers: {
-                'X-RapidAPI-Key': env.RAPIDAPI_KEY,
-                'X-RapidAPI-Host': p.host,
-                'Content-Type': p.type === 'raw' ? file.type || 'application/octet-stream' : undefined,
-              },
+              headers,
               body: p.type === 'raw' ? bytes : multipartForShazam(file, bytes),
             });
           } catch (e) {
@@ -160,7 +163,6 @@ function shazamProviders(env) {
 function multipartForShazam(file, bytes) {
   const fd = new FormData();
   fd.append('file', new Blob([bytes], { type: file.type || 'audio/webm' }), file.name || 'audio');
-  fd.append('upload_file', new Blob([bytes], { type: file.type || 'audio/webm' }), file.name || 'audio');
   return fd;
 }
 
